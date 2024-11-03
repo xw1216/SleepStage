@@ -34,8 +34,8 @@ class MainGUI(QMainWindow, QtStyleTools):
 
     def auto_resize(self):
         screen = QGuiApplication.primaryScreen().geometry()
-        width = screen.width() // 4
-        height = screen.height() // 3
+        width = screen.width() // 5
+        height = screen.height() // 2
         size = QSize(width, height)
         self.setMinimumSize(size)
         self.resize(size)

@@ -1,8 +1,10 @@
 from abc import abstractmethod
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QListWidget, QHBoxLayout, QPushButton, QGridLayout, \
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QListWidget, QPushButton, QGridLayout, \
     QListWidgetItem, QSizePolicy
+
+from gui.style.theme import NAV_LABEL_STYLE, LISTVIEW_INDICATOR_STYLE
 
 
 class BaseTab(QWidget):
@@ -12,35 +14,32 @@ class BaseTab(QWidget):
         self.name = name
         self.icon = icon
         self.setObjectName(f"{name['en']}_tab" if name is not None else "base_tab")
-
         self.__setup_ui()
-        self.__adjust_ui()
-        self.__setup_slot()
 
     def __setup_ui(self):
-        self.lay = QVBoxLayout(parent=self)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.lay = QVBoxLayout()
 
-        self.widget_title = QWidget(self)
-        self.widget_list = QWidget(self)
+        self.widget_title = QWidget()
         self.lay_title = QGridLayout()
+        self.widget_list = QWidget()
         self.lay_list = QVBoxLayout()
 
         self.title = QLabel('标题')
+        self.title.setStyleSheet(NAV_LABEL_STYLE)
         self.btn_affirm = QPushButton('确认')
-        self.list_option = QListWidget()
 
         self.lay_title.addWidget(self.title, 0, 0, 1, 2)
         self.lay_title.addWidget(self.btn_affirm, 0, 2, 1, 1)
         self.widget_title.setLayout(self.lay_title)
 
+        self.list_option = QListWidget()
+        self.list_option.setStyleSheet(LISTVIEW_INDICATOR_STYLE)
         self.lay_list.addWidget(self.list_option)
         self.widget_list.setLayout(self.lay_list)
 
         self.lay.addWidget(self.widget_title)
         self.lay.addWidget(self.widget_list)
-        self.setLayout(self.lay)
-
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     @abstractmethod
     def __adjust_ui(self):
@@ -57,8 +56,10 @@ class BaseTab(QWidget):
             Qt.ItemFlag.ItemIsEnabled |
             Qt.ItemFlag.ItemIsSelectable |
             Qt.ItemFlag.ItemIsUserCheckable |
-            Qt.ItemFlag.ItemNeverHasChildren
+            Qt.ItemFlag.ItemNeverHasChildren |
+            Qt.ItemFlag.ItemIsDragEnabled
         )
+        item.setCheckState(Qt.CheckState.Unchecked)
         self.list_option.addItem(item)
 
     def clear_list_item(self):

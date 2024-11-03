@@ -14,11 +14,19 @@ class SubjectSelectTab(BaseTab):
         icon = ICONS.qta(name='mdi6.database-plus-outline')
         super().__init__(name, icon, parent)
 
+        self.__adjust_ui()
+        self.__setup_slot()
+        self.setLayout(self.lay)
+
     def __adjust_ui(self):
         self.title.setText('选择需分析的个体')
 
     def __setup_slot(self):
         self.btn_affirm.clicked.connect(self.on_affirm_btn_clicked)
+
+    @Slot(list)
+    def on_file_scan_done(self, subjects: list):
+        pass
 
     @Slot()
     def on_affirm_btn_clicked(self):

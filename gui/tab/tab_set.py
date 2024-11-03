@@ -23,6 +23,8 @@ class TabSetWidget(QTabWidget):
 
         for tab_func in self.tab_list:
             tab = tab_func(parent=self)
+            if isinstance(tab, SpaceTimeSelectTab):
+                tab.on_read_out_file_meta(['EEG-1', 'EEG-2', 'EMG-1'], 5, 180)
             self.addTab(tab, tab.name['zh'])
             self.tabs.append(tab)
 

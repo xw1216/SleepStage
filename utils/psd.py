@@ -136,7 +136,7 @@ for i in range(len(file_idx)):
     info_list.append([])
 
     # 提取后的数据文件路径
-    path = os.path.join('dataset', 'extract', file_idx[i])
+    path = os.path.join('../dataset', 'extract', file_idx[i])
     data = os.path.join(path, file_idx[i] + '_wave.npy')
     label = os.path.join(path, file_idx[i] + '_epoch.csv')
 

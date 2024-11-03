@@ -84,7 +84,7 @@ n_ch = 4
 n_sec = 4
 
 # 父目录
-data_dir = os.path.join('dataset')
+data_dir = os.path.join('../dataset')
 
 # 结果目录
 target_dir = os.path.join(data_dir, 'extract')

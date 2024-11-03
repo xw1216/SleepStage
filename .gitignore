@@ -1,4 +1,5 @@
-dataset/
+dataset/extract/
+dataset/raw/
 *.jpg
 *.png
 *.svg

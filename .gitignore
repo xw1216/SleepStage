@@ -1,8 +1,8 @@
 dataset/extract/
 dataset/raw/
+test/**/*.svg
 *.jpg
 *.png
-*.svg
 *.zip
 *.7z
 *.gif

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QMainWindow, QStatusBar, QVBoxLayout, QWidget, QSi
 from qt_material import QtStyleTools
 
 from gui.tab.tab_set import TabSetWidget
-from proc.Analyzer import Analyzer
+from proc.analyzer import Analyzer
 from utils.log import LOG
 
 

@@ -5,9 +5,10 @@ import logging
 import numpy as np
 import pandas as pd
 from sonpy import lib as sp
+from sonpy.amd64.sonpy import SonFile
 
 
-def read_meta_info(handle):
+def read_meta_info(handle: SonFile):
     """
     从 smrx 文件中中读取元信息
     :param handle: 文件句柄
@@ -16,7 +17,14 @@ def read_meta_info(handle):
     pts = 0
     info = []
     uneven = False
+    ch_name = []
     # 遍历 4 个通道
+    n_ch = handle.MaxChannels()
+
+    for ch in range(n_ch):
+        if handle.ChannelType(ch) == sp.DataType.Adc:
+            ch_name.append(handle.GetChannelTitle(ch))
+
     for ch in range(n_ch):
         if handle.ChannelType(ch) == sp.DataType.Adc:
 

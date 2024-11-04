@@ -1,10 +1,11 @@
 from PySide6.QtCore import Slot, Qt, Signal
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QGridLayout, QLabel, QSpinBox, QWidget, QScrollBar, QSlider
+from PySide6.QtWidgets import QGridLayout, QLabel, QSpinBox, QWidget, QScrollBar, QSlider, QMessageBox
 
 from gui.style.icon import ICONS
 from gui.style.theme import NAV_LABEL_STYLE
 from gui.tab.base_tab import BaseTab
+from utils.log import LOG
 
 
 class SpaceTimeSelectTab(BaseTab):
@@ -21,7 +22,7 @@ class SpaceTimeSelectTab(BaseTab):
             ]
         )
         super().__init__(name, icon, parent)
-        self.wnd_len = 4
+        self.wnd_sec = 4
         self.wnd_cnt = 500
 
         self.__adjust_ui()
@@ -74,18 +75,18 @@ class SpaceTimeSelectTab(BaseTab):
         self.bar_time_end.valueChanged[int].connect(self.on_end_slider_change)
 
     def collect_time_range(self):
-        return self.bar_time_start.value(), self.bar_time_end.value()
+        return self.bar_time_start.value() - 1, self.bar_time_end.value()
 
     @Slot(list, int, int)
-    def on_read_out_file_meta(self, ch_list: list[str], wnd_cnt: int, wnd_len: int):
+    def on_read_out_file_meta(self, ch_list: list[str], wnd_cnt: int, wnd_sec: int):
         self.wnd_cnt = wnd_cnt
-        self.wnd_len = wnd_len
+        self.wnd_sec = wnd_sec
 
-        self.desc_time_len.setText(f'每个 {str(wnd_len)} 秒钟')
-        self.cnt_time_len.setText(f'共 {str(wnd_cnt)} 个')
+        self.desc_time_len.setText(f'每个 {str(wnd_sec)} 秒钟')
+        self.cnt_time_len.setText(f'共 {str(self.wnd_cnt)} 个')
 
-        self.bar_time_start.setRange(1, wnd_cnt)
-        self.bar_time_end.setRange(1, wnd_cnt)
+        self.bar_time_start.setRange(1, self.wnd_cnt)
+        self.bar_time_end.setRange(1, self.wnd_cnt)
         self.bar_time_start.setValue(1)
         self.bar_time_end.setValue(wnd_cnt)
 
@@ -106,7 +107,7 @@ class SpaceTimeSelectTab(BaseTab):
         self.label_time_end_convert.setText(s)
 
     def time_format_converter(self, cnt: int):
-        secs_total = cnt * self.wnd_len
+        secs_total = cnt * self.wnd_sec
         hours = secs_total // 3600
         mins = (secs_total - hours * 3600) // 60
         secs = (secs_total - hours * 3600 - mins * 60)
@@ -114,4 +115,15 @@ class SpaceTimeSelectTab(BaseTab):
 
     @Slot()
     def on_affirm_btn_clicked(self):
-        pass
+        items = self.collect_checked_items()
+        t_range = self.collect_time_range()
+
+        if len(items) == 0:
+            QMessageBox.warning(self, "警告", "没有选择任何通道")
+            return
+        elif t_range[0] > t_range[1]:
+            QMessageBox.warning(self, "警告", "起始时间不能大于终止时间")
+            return
+
+        self.sig_space_time_sel_done.emit(items, t_range)
+        LOG.info('通道与时间选择完成')

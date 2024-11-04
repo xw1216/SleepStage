@@ -1,10 +1,10 @@
 from PySide6.QtCore import Slot, QSize, SIGNAL, Signal
-from PySide6.QtWidgets import QTabWidget, QSizePolicy, QMessageBox
+from PySide6.QtWidgets import QTabWidget, QSizePolicy, QMessageBox, QFileDialog
 
 from gui.tab.base_tab import BaseTab
 from gui.tab.space_time_select_tab import SpaceTimeSelectTab
 from gui.tab.subject_select_tab import SubjectSelectTab
-from proc.Analyzer import Analyzer
+from proc.analyzer import Analyzer
 from utils.log import LOG
 
 
@@ -15,6 +15,7 @@ class TabSetWidget(QTabWidget):
     ]
 
     sig_start_raw_extract = Signal(dict)
+    sig_start_psd_plot = Signal(dict, tuple, str)
     sig_read_out_file_meta = Signal(list[str], int, int)
 
     def __init__(self, kit=None, parent=None):
@@ -23,6 +24,7 @@ class TabSetWidget(QTabWidget):
         self.kit: Analyzer = kit
 
         self.__setup_ui()
+        self.__setup_slot()
 
     def __setup_ui(self):
         self.setTabPosition(self.TabPosition.North)
@@ -59,8 +61,9 @@ class TabSetWidget(QTabWidget):
 
 
     @Slot()
-    def on_raw_extract_done(self):
-        pass
+    def on_raw_extract_done(self, chs: list[str], wnd_cnt: int, wnd_sec: int):
+        self.setCurrentIndex(1)
+        self.sig_read_out_file_meta.emit(chs, wnd_cnt, wnd_sec)
 
     @Slot(str)
     def on_extract_error(self, msg: str):
@@ -70,11 +73,14 @@ class TabSetWidget(QTabWidget):
 
     @Slot(dict, tuple)
     def on_space_time_select_done(self, items, t_range):
-        pass
+        save_path = QFileDialog.getExistingDirectory(caption='请选择结果保存文件夹')
+        save_path = str(save_path)
+        self.sig_start_psd_plot.emit(items, t_range, save_path)
+        LOG.info('开始数据分析')
 
     @Slot()
     def on_psd_calc_plot_done(self):
-        pass
+        QMessageBox.information(self, '通知', '分析成功完成')
 
 
 

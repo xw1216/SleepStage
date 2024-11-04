@@ -116,8 +116,7 @@ class SubjectSelectTab(BaseTab):
     def on_affirm_btn_clicked(self):
         pairs = self.collect_checked_items()
         if len(pairs.keys()) < 1:
-            QMessageBox.information(self, "通知",
-                                    "没有选择任何个体")
+            QMessageBox.warning(self, "警告", "没有选择任何个体")
             return
         self.sig_sub_sel_done.emit(pairs)
 

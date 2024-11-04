@@ -21,7 +21,7 @@ class Log:
     def enable_file_record(self):
         os.makedirs('log', exist_ok=True)
         self.path = os.path.join('log', f'{self.format_time()}.log')
-        self.file_handler = logging.FileHandler(self.path)
+        self.file_handler = logging.FileHandler(self.path, encoding='utf-8')
         self.file_handler.setLevel(self.level)
         self.file_handler.setFormatter(
             fmt=logging.Formatter(
@@ -38,17 +38,18 @@ class Log:
         return self.time.strftime(fmt)
 
     def register_status_bar(self, status_bar: QStatusBar):
-        if self.status_bar is not None:
+        if self.status_bar is None:
             self.status_bar = status_bar
 
     def sync_status(self, msg):
         if msg is None or self.status_bar is None:
             return
-        self.status_bar.showMessage(text=msg, timeout=10)
+        self.status_bar.showMessage(msg, 5000)
 
-    @staticmethod
-    def info(msg):
+    def info(self, msg, sync=True):
         logging.log(logging.INFO, msg)
+        if sync:
+            self.sync_status(msg)
 
     def error(self, msg):
         logging.error(msg)

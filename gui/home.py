@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QMainWindow, QStatusBar, QVBoxLayout, QWidget, QSi
 from qt_material import QtStyleTools
 
 from gui.tab.tab_set import TabSetWidget
+from proc.Analyzer import Analyzer
 from utils.log import LOG
 
 
@@ -14,6 +15,7 @@ class MainGUI(QMainWindow, QtStyleTools):
     def __init__(self, log_level=logging.INFO):
         super().__init__()
         self.setWindowTitle('MiceSleepAnalysis')
+        self.kit = Analyzer()
 
         self.__setup_ui()
         self.__setup_slot()
@@ -22,10 +24,11 @@ class MainGUI(QMainWindow, QtStyleTools):
 
     def __setup_ui(self):
         self.statusbar = QStatusBar(self)
-        self.tab_set = TabSetWidget(self)
+        self.tab_set = TabSetWidget(self.kit, self)
 
         self.setStatusBar(self.statusbar)
         LOG.register_status_bar(self.statusbar)
+        self.statusbar.showMessage('状态栏')
 
         self.setCentralWidget(self.tab_set)
 
@@ -34,7 +37,7 @@ class MainGUI(QMainWindow, QtStyleTools):
 
     def auto_resize(self):
         screen = QGuiApplication.primaryScreen().geometry()
-        width = screen.width() // 5
+        width = screen.width() // 4
         height = screen.height() // 2
         size = QSize(width, height)
         self.setMinimumSize(size)

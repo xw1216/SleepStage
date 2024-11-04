@@ -26,7 +26,7 @@ ICON_PATTERN = {
     'color_selected': QColor.fromString('#00bcd4')
 }
 
-NAV_LABEL_FONT_SIZE = 16
+NAV_LABEL_FONT_SIZE = 17
 
 NAV_LABEL_STYLE = f'''
     QLabel{{

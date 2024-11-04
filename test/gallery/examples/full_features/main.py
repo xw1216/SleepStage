@@ -123,7 +123,7 @@ class RuntimeStylesheets(QMainWindow, QtStyleTools):
             ]
         except:
             self.main.window_icon = logo
-            self.main.actionToolbar.icon = logo
+            self.main.actionToolbar.custom_icon = logo
             [
                 setattr(self.main.listWidget_2.item(i), 'icon', logo_frame)
                 for i in range(self.main.listWidget_2.count)

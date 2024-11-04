@@ -1,6 +1,7 @@
 from abc import abstractmethod
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QListWidget, QPushButton, QGridLayout, \
     QListWidgetItem, QSizePolicy
 
@@ -12,7 +13,7 @@ class BaseTab(QWidget):
         super().__init__(parent=parent)
 
         self.name = name
-        self.icon = icon
+        self.custom_icon: QIcon = icon
         self.setObjectName(f"{name['en']}_tab" if name is not None else "base_tab")
         self.__setup_ui()
 

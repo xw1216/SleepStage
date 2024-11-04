@@ -13,7 +13,7 @@ if __name__ == "__main__":
     if sys.platform == 'win32':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MiceSleepAnalysis")
 
-    theme = 'light_blue_500.xml'
+    theme = 'light_blue.xml'
     app = QtWidgets.QApplication([])
     apply_stylesheet(
         app,

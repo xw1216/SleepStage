@@ -1,5 +1,6 @@
 import os
 import shutil
+from operator import index
 
 import numpy as np
 import pandas as pd
@@ -25,17 +26,19 @@ class Analyzer(QObject):
         self.wnd_cnt = -1
 
         self.nfft = 10000
-        self.fft_freq_lim = 300
+        self.fft_freq_down = 5
+        self.fft_freq_up = 300
+        self.cnt_band = 4
         self.low_cut = 0.3
         self.high_cut = 30
 
         self.fs = -1
         self.pts = -1
-        self.chs = []
 
         self.sub_pair: dict[str, int] = {}
         self.ch_pair: dict[str, int] = {}
         self.time_range: tuple[int, int] = (0, 0)
+
         self.save_path = '.'
 
     def reset(self):
@@ -43,13 +46,12 @@ class Analyzer(QObject):
         self.wnd_cnt = -1
 
         self.nfft = 10000
-        self.fft_freq_lim = 300
+        self.fft_freq_up = 300
         self.low_cut = 0.3
         self.high_cut = 30
 
         self.fs = -1
         self.pts = -1
-        self.chs = []
 
         self.sub_pair = {}
         self.ch_pair = {}
@@ -73,20 +75,20 @@ class Analyzer(QObject):
             self.wnd_cnt, self.wnd_sec
         )
 
-    def collect_raw_meta(self, pair: dict[str, int]):
+    def collect_raw_meta(self, sub_pair: dict[str, int]):
         src_dir = data_src_dir()
         pair_ch_list = []
 
-        for k in pair.keys():
-            sub_src = os.path.join(src_dir, k + raw_eeg_file_ext_name())
+        for sub in sub_pair.keys():
+            sub_src = os.path.join(src_dir, sub + raw_eeg_file_ext_name())
             handle = self.open_sonpy_file(sub_src)
 
             file_ch_meta = self.read_sonpy_meta_info(handle)
             pair_ch_list.append(file_ch_meta)
-            self.save_sub_info(k, file_ch_meta)
+            self.save_sub_info(sub, file_ch_meta)
 
-            self.copy_epoch_files(k)
-            LOG.info(f'正在提取 {k} 的数据元信息')
+            self.copy_epoch_files(sub)
+            LOG.info(f'正在提取 {sub} 的数据元信息')
 
         # shape [sub, ch] element dict
         ch_pair = self.check_ch_consist(pair_ch_list)
@@ -193,11 +195,11 @@ class Analyzer(QObject):
 
     def check_data_read_result(self, data, path):
         if len(data) == 1 and data[0] < 0:
-            raise RuntimeError(f'Error reading data {path}: {sp.GetErrorString(int(data[0]))}')
+            raise RuntimeError(f'读取数据时错误 {path}: {sp.GetErrorString(int(data[0]))}')
         elif len(data) == 0:
-            raise RuntimeError('No data read')
+            raise RuntimeError('未能读取数据点')
         elif len(data) != self.pts:
-            raise RuntimeError(f'Bad number of points read, expected {self.pts} but got {len(data)}')
+            raise RuntimeError(f'数据样本数不一致, 基准值 {self.pts}， 异常值 {len(data)}')
 
     @Slot(dict, tuple, str)
     def rev_ch_time_selection(self, ch_pairs: dict, t_range: tuple[int, int], save_path: str):
@@ -205,9 +207,16 @@ class Analyzer(QObject):
         self.time_range = t_range
 
         info_list = self.calc_sleep_type_psd()
+        self.save_psd_table(info_list, save_path)
+
+        result = self.transpose_info_list(info_list)
+        plot_data = self.calc_average_plot_data(result)
+        self.plot_and_save_psd(plot_data, save_path)
+
+        self.sig_psd_calc_plot_done()
 
     def calc_sleep_type_psd(self):
-        # shape [sub, type, (f [freq], p[ch, freq])]
+        # info_list shape [sub, type, (f [freq], p[ch, freq])]
         info_list = []
         for (i, sub) in enumerate(self.sub_pair.keys()):
             info_list.append([])
@@ -218,6 +227,7 @@ class Analyzer(QObject):
             data = np.load(data_dir)
             label = pd.read_csv(label_dir)
 
+            LOG.info(f'对 {sub} 个体数据滤波')
             data = self.highpass_filter(data)
             data = self.lowpass_filter(data)
 
@@ -229,6 +239,7 @@ class Analyzer(QObject):
             nrem_idx = np.where(label == 1)[0]
             rem_idx = np.where(label == 2)[0]
 
+            LOG.info(f'计算 {sub} 个体数据频谱图')
             # 遍历三种类别的时间段
             for (name, j) in [
                 ('wake', wake_idx),
@@ -241,11 +252,33 @@ class Analyzer(QObject):
                 f, p = sig.periodogram(wave, self.fs, axis=2, nfft=self.nfft)
 
                 # 选取限定范围内的频率与功率点对
-                f = f[1:self.fft_freq_lim + 1]
-                p = p[:, :, 1:self.fft_freq_lim + 1]
+                f = f[0:self.fft_freq_up + 1]
+                p = p[:, :, 0:self.fft_freq_up + 1]
                 p = p.mean(axis=1)
                 info_list[i].append((f, p))
+
+        # info_list shape [sub, type, (f ndarray [freq], p ndarray [ch, freq])]
         return info_list
+
+    def save_psd_table(self, info_list, save_path):
+        LOG.info('保存频谱数据表中')
+        save_path = os.path.join(save_path, 'table')
+        os.makedirs(save_path, exist_ok=True)
+
+        columns = ['个体', '睡眠类型', '通道', '频率点(Hz)', '功率谱密度(uV^2/Hz)']
+        for (i, sub) in enumerate(self.sub_pair.keys()):
+            df = pd.DataFrame(columns=columns)
+            for (j, tp) in ['wake', 'nrem', 'rem']:
+                freq = info_list[i][j][0]
+                psd = info_list[i][j][1]
+                for (k, ch) in enumerate(self.ch_pair.keys()):
+                    f_len = freq.shape[0]
+                    for l in range(f_len):
+                        f = freq[l]
+                        p = psd[k][l]
+                        df.loc[len(df)] = [sub, tp, ch, f, p]
+            df_save_path = os.path.join(save_path, f'{sub}_psd.xlsx')
+            df.to_excel(df_save_path, index=False)
 
     def highpass_filter(self, data):
         sos = sig.butter(2, self.low_cut, 'highpass', fs=self.fs, output='sos')
@@ -260,74 +293,82 @@ class Analyzer(QObject):
         return data
 
     def calc_band_psd(self, x, y):
-        # TODO
-        start_idx = 1
-
-        x = x[start_idx:]
-        y = y[start_idx:]
+        x = x[self.fft_freq_down:self.fft_freq_up + 1]
+        y = y[self.fft_freq_down:self.fft_freq_up + 1]
 
         # 计算功率占比，单位%
         total = y.sum()
         y_norm = (y / total) * 100
 
-        y_norm = np.concatenate((np.zeros(start_idx), y_norm), axis=0)
+        # 恢复 fft 原始长度以方便整数索引
+        y_norm = np.concatenate((np.zeros(self.fft_freq_down), y_norm), axis=0)
 
         # 计算分频段功率占比
-        low_delta = y_norm[start_idx:7].sum()  # [0.25, 2)
-        high_delta = y_norm[7:16].sum()  # [2, 4)
-        theta = y_norm[16: 40].sum()  # [4, 10)
-        alpha = y_norm[40: 81].sum()  # [10, 20]
+        delta = y_norm[self.fft_freq_down:40]               # [0.5, 4)
+        theta = y_norm[40:80].sum()                         # [4, 8)
+        alpha = y_norm[80:130].sum()                        # [8, 13)
+        beta = y_norm[130:self.fft_freq_up + 1].sum()       # [13, 30]
 
-        y_band = np.array([low_delta, high_delta, theta, alpha])
-        y_norm = y_norm[start_idx:]
+        y_band = np.array([delta, theta, alpha, beta])
+        y_norm = y_norm[self.fft_freq_down:self.fft_freq_up + 1]
         return x, y_norm, y_band
 
-
-    def rearrange_intermediate_data(self, info_list):
-        # TODO 确定 chs 的含义
-        # source shape [sub, type, (f [freq], p[ch, freq])]
+    def transpose_info_list(self, info_list):
+        # info_list shape [sub, type, (f [freq], p[ch, freq])]
         # result shape [ch, sub, type]
         result = []
         chs = self.ch_pair.values()
         # 多维列表维度转换
-        for i in chs:
+        for (i, ch) in enumerate(chs):
             result.append([])
             for j in range(len(info_list)):
                 result[i].append([])
                 for k in range(3):
                     # source shape [sub, type, (f [freq], p[ch, freq])]
                     x = info_list[j][k][0]
-                    y = info_list[j][k][1][i]
+                    y = info_list[j][k][1][ch]
                     x, y_norm, y_band = self.calc_band_psd(x, y)
 
                     # result shape [ch, sub, type] element (x, y_norm, y_band)
                     result[i][j].append((x, y_norm, y_band))
 
+        # result shape [ch, sub, type] element (x, y_norm, y_band)
+        return result
+
+    def calc_average_plot_data(self, result):
+        # result shape [ch, sub, type] element (x, y_norm, y_band)
+        n_sub = len(self.sub_pair.keys())
+        chs = self.ch_pair.values()
+
         # 遍历通道，睡眠类型与个体做功率平均操作
         plot_data = []
-        for i in chs:
+        for ch in range(len(chs)):
             plot_data.append([])
             for k in range(3):
-                x = result[i][0][k][0]
-                y_norm_mean = result[i][0][k][1]
-                y_band_mean = result[i][0][k][2]
+                x = result[ch][0][k][0]
+                y_norm_mean = result[ch][0][k][1]
+                y_band_mean = result[ch][0][k][2]
 
-                for j in range(1, len(info_list) - 1):
-                    y_norm_mean += result[i][j][k][1]
-                    y_band_mean += result[i][j][k][2]
-                y_norm_mean /= len(info_list)
-                y_band_mean /= len(info_list)
+                for j in range(1, n_sub):
+                    y_norm_mean += result[ch][j][k][1]
+                    y_band_mean += result[ch][j][k][2]
+                y_norm_mean /= n_sub
+                y_band_mean /= n_sub
 
-                plot_data[i].append((x, y_norm_mean, y_band_mean))
+                plot_data[ch].append((x, y_norm_mean, y_band_mean))
 
         # result shape [ch, type] element (x, y_norm, y_band)
         return plot_data
 
-    def plot_psd_and_save(self, plot_data):
+    def plot_and_save_psd(self, plot_data, save_path):
         chs = self.ch_pair.values()
+        save_path = os.path.join(save_path, 'figure')
+        os.makedirs(save_path, exist_ok=True)
 
-        for i in chs:
-            label = f'M{i} {"EEG" if i < n_eeg else "EMG"}'
+        LOG.info('正在绘制功率谱密度图')
+
+        for (i, ch) in enumerate(chs):
+            label = ch
             # 图片大小
             plt.figure(figsize=(10, 6))
             # 全图属性
@@ -341,8 +382,8 @@ class Analyzer(QObject):
             width = 0.2
             bar_offset_arr = [-0.2, 0, 0.2]
             # 子波频率
-            x_band = np.arange(4)
-            x_band_label = ['0.5-2', '2-4', '4-10', '10-20']
+            x_band = np.arange(self.cnt_band)
+            x_band_label = ['0.5-4', '4-8', '8-13', '13-30']
 
             # 遍历通道内不同睡眠类型
             for j, c in enumerate(['wake', 'nrem', 'rem']):
@@ -384,6 +425,10 @@ class Analyzer(QObject):
             # plt.grid(True)
             plt.legend()
 
+            fig_save_path = os.path.join(save_path, f'psd_{ch}.png')
+            plt.savefig(fig_save_path)
+
+            # TODO
             # 展示图片
             plt.show()
             plt.clf()

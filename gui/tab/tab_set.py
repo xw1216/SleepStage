@@ -55,9 +55,9 @@ class TabSetWidget(QTabWidget):
 
 
     @Slot(dict)
-    def on_subject_select_done(self, pairs: dict):
+    def on_subject_select_done(self, sub_pair: dict):
         LOG.info('完成个体选择，即将提取文件数据')
-        self.sig_start_raw_extract.emit(pairs)
+        self.sig_start_raw_extract.emit(sub_pair)
 
 
     @Slot()
@@ -81,6 +81,7 @@ class TabSetWidget(QTabWidget):
     @Slot()
     def on_psd_calc_plot_done(self):
         QMessageBox.information(self, '通知', '分析成功完成')
+        LOG.info('分析完成')
 
 
 

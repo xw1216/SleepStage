@@ -1,5 +1,6 @@
 dataset/extract/
 dataset/raw/
+dataset/standard/
 test/**/*.svg
 *.jpg
 *.png

@@ -6,6 +6,7 @@ import pandas as pd
 import scipy.signal as sig
 import matplotlib.pyplot as plt
 from PySide6.QtCore import QObject, Slot, Signal
+from matplotlib.ticker import FormatStrFormatter
 from sonpy import lib as sp
 from sonpy.amd64.sonpy import SonFile
 
@@ -23,9 +24,9 @@ class Analyzer(QObject):
         self.wnd_sec = 4
         self.wnd_cnt = -1
 
-        self.nfft = 10000
-        self.fft_freq_down = 5
-        self.fft_freq_up = 300
+        self.nfft = 4000
+        self.fft_freq_down = 2
+        self.fft_freq_up = 120
         self.cnt_band = 4
         self.low_cut = 0.3
         self.high_cut = 30
@@ -43,9 +44,9 @@ class Analyzer(QObject):
         self.wnd_sec = 4
         self.wnd_cnt = -1
 
-        self.nfft = 10000
-        self.fft_freq_down = 5
-        self.fft_freq_up = 300
+        self.nfft = 4000
+        self.fft_freq_down = 2
+        self.fft_freq_up = 120
         self.cnt_band = 4
         self.low_cut = 0.3
         self.high_cut = 30
@@ -154,7 +155,7 @@ class Analyzer(QObject):
                 if self.fs < 0:
                     self.fs = fs
                     self.pts = handle.ChannelMaxTime(ch)
-                    self.nfft = self.fs * 10
+                    self.nfft = self.fs * 4
                 else:
                     if self.fs != round(1 / handle.GetTimeBase()):
                         raise RuntimeError(
@@ -208,17 +209,17 @@ class Analyzer(QObject):
     def rev_ch_time_selection(self, ch_pairs: dict, t_range: tuple[int, int], save_path: str):
         self.ch_pair = ch_pairs
         self.time_range = t_range
-        # TODO 支持选择时间范围功能
-        info_list = self.calc_sleep_type_psd()
+
+        info_list = self.calc_sleep_type_psd(t_range)
         self.save_psd_table(info_list, save_path)
 
         result = self.transpose_info_list(info_list)
         plot_data = self.calc_average_plot_data(result)
         self.plot_and_save_psd(plot_data, save_path)
 
-        self.sig_psd_calc_plot_done()
+        self.sig_psd_calc_plot_done.emit()
 
-    def calc_sleep_type_psd(self):
+    def calc_sleep_type_psd(self, t_range: tuple[int, int]):
         # info_list shape [sub, type, (f [freq], p[ch, freq])]
         info_list = []
         for (i, sub) in enumerate(self.sub_pair.keys()):
@@ -230,12 +231,15 @@ class Analyzer(QObject):
             data = np.load(data_dir)
             label = pd.read_csv(label_dir)
 
+            ch_sel = list(self.ch_pair.values())
+            data = data[ch_sel, t_range[0] * self.fs * self.wnd_sec:t_range[1] * self.fs * self.wnd_sec]
             LOG.info(f'对 {sub} 个体数据滤波')
             data = self.highpass_filter(data)
-            data = self.lowpass_filter(data)
-
+            # data = self.lowpass_filter(data)
             data = data.reshape(len(self.ch_pair.keys()), -1, self.fs * self.wnd_sec)
+
             label = (label['class'].values - 1).reshape(-1)
+            label = label[t_range[0]:t_range[1]]
 
             # 将不同类的时间段分离出来
             wake_idx = np.where(label == 0)[0]
@@ -307,10 +311,10 @@ class Analyzer(QObject):
         y_norm = np.concatenate((np.zeros(self.fft_freq_down), y_norm), axis=0)
 
         # 计算分频段功率占比
-        delta = y_norm[self.fft_freq_down:40].sum()         # [0.5, 4)
-        theta = y_norm[40:80].sum()                         # [4, 8)
-        alpha = y_norm[80:130].sum()                        # [8, 13)
-        beta = y_norm[130:self.fft_freq_up + 1].sum()       # [13, 30]
+        delta = y_norm[self.fft_freq_down:16].sum()         # [0.5, 4)
+        theta = y_norm[16:32].sum()                         # [4, 8)
+        alpha = y_norm[32:52].sum()                         # [8, 13)
+        beta = y_norm[52:self.fft_freq_up + 1].sum()        # [13, 30]
 
         y_band = np.array([delta, theta, alpha, beta])
         y_norm = y_norm[self.fft_freq_down:self.fft_freq_up + 1]
@@ -320,9 +324,9 @@ class Analyzer(QObject):
         # info_list shape [sub, type, (f [freq], p[ch, freq])]
         # result shape [ch, sub, type]
         result = []
-        chs = self.ch_pair.values()
+        chs = len(self.ch_pair.keys())
         # 多维列表维度转换
-        for (i, ch) in enumerate(chs):
+        for i in range(chs):
             result.append([])
             for j in range(len(info_list)):
                 result[i].append([])
@@ -341,11 +345,11 @@ class Analyzer(QObject):
     def calc_average_plot_data(self, result):
         # result shape [ch, sub, type] element (x, y_norm, y_band)
         n_sub = len(self.sub_pair.keys())
-        chs = self.ch_pair.values()
+        n_ch = len(self.ch_pair.keys())
 
         # 遍历通道，睡眠类型与个体做功率平均操作
         plot_data = []
-        for ch in range(len(chs)):
+        for ch in range(n_ch):
             plot_data.append([])
             for k in range(3):
                 x = result[ch][0][k][0]
@@ -364,7 +368,7 @@ class Analyzer(QObject):
         return plot_data
 
     def plot_and_save_psd(self, plot_data, save_path):
-        chs = self.ch_pair.values()
+        chs = self.ch_pair.keys()
         save_path = os.path.join(save_path, 'figure')
         os.makedirs(save_path, exist_ok=True)
 
@@ -397,10 +401,14 @@ class Analyzer(QObject):
                 # 功率分布百分比折线图
                 plt.subplot(1, 2, 1)
                 plt.plot(x, y_norm, label=c)
+                ax = plt.gca()
+                ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
 
                 # 波段功率占比条形图
                 plt.subplot(1, 2, 2)
                 plt.bar(x_band + bar_offset_arr[j], y_band, width, label=c)
+                ax = plt.gca()
+                ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
 
                 # 更改为对数分贝单位
                 # plt.semilogy(x, y, label=c)
@@ -436,6 +444,3 @@ class Analyzer(QObject):
             plt.show()
             plt.clf()
             plt.close()
-
-    def calc_and_save_plot(self):
-        self.sig_psd_calc_plot_done.emit()

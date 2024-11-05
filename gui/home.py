@@ -1,8 +1,6 @@
-import logging
-
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QSize, QThread
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QMainWindow, QStatusBar
+from PySide6.QtWidgets import QMainWindow, QStatusBar, QMessageBox
 from qt_material import QtStyleTools
 
 from gui.tab.tab_set import TabSetWidget
@@ -15,11 +13,15 @@ class MainGUI(QMainWindow, QtStyleTools):
         super().__init__()
         self.setWindowTitle('MiceSleepAnalysis')
         self.kit = Analyzer()
+        self.th = QThread()
 
         self.__setup_ui()
         self.__setup_slot()
         self.auto_resize()
         self.move_center()
+
+        self.kit.moveToThread(self.th)
+        self.th.start()
 
     def __setup_ui(self):
         self.statusbar = QStatusBar(self)
@@ -48,3 +50,17 @@ class MainGUI(QMainWindow, QtStyleTools):
         cen_x = (screen.width() - size.width()) // 2
         cen_y = (screen.height() - size.height()) // 2
         self.move(cen_x, cen_y)
+
+    def closeEvent(self, event):
+        reply = QMessageBox.question(
+            self,
+            "关闭程序", "你确定要退出程序吗？",
+            QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.No:
+            event.ignore()
+
+        if self.th.isRunning():
+            self.th.quit()
+            self.th.wait()

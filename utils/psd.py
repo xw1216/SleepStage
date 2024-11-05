@@ -4,6 +4,7 @@ import pandas as pd
 
 import scipy.signal as sig
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter, FormatStrFormatter
 
 
 def filter_freq_visualize():
@@ -47,14 +48,14 @@ def highpass_filter(data):
     :return: 滤波后数据
     """
     # 2 阶 Butter 滤波器，高通 1.0 Hz，数据采样率 1000 Hz
-    sos = sig.butter(2, 1.0, 'highpass', fs=1000, output='sos')
+    sos = sig.butter(2, 0.3, 'highpass', fs=1000, output='sos')
     # 零相位数字滤波
     data = sig.sosfiltfilt(sos, data, axis=1)
     return data
 
 
 def calc_band_psd(x, y):
-    start_idx = 1
+    start_idx = 2
 
     x = x[start_idx:]
     y = y[start_idx:]
@@ -66,10 +67,10 @@ def calc_band_psd(x, y):
     y_norm = np.concatenate((np.zeros(start_idx), y_norm), axis=0)
 
     # 计算分频段功率占比
-    low_delta = y_norm[start_idx:7].sum()  # [0.25, 2)
-    high_delta = y_norm[7:16].sum()  # [2, 4)
-    theta = y_norm[16: 40].sum()  # [4, 10)
-    alpha = y_norm[40: 81].sum()  # [10, 20]
+    low_delta = y_norm[start_idx:16].sum()  # [0.5, 4)
+    high_delta = y_norm[16:32].sum()  # [4, 8)
+    theta = y_norm[32: 52].sum()  # [80, 13)
+    alpha = y_norm[52: lim+1].sum()  # [13, 30]
 
     y_band = np.array([low_delta, high_delta, theta, alpha])
     y_norm = y_norm[start_idx:]
@@ -104,7 +105,7 @@ def rearrange_and_calc_plot_data(info_list, ch):
             y_norm_mean = result[i][0][k][1]
             y_band_mean = result[i][0][k][2]
 
-            for j in range(1, len(info_list) - 1):
+            for j in range(1, len(info_list)):
                 y_norm_mean += result[i][j][k][1]
                 y_band_mean += result[i][j][k][2]
             y_norm_mean /= len(info_list)
@@ -126,7 +127,7 @@ file_idx = ['01', '02',]
 # 常量定义
 ch = 0      # 通道数
 n_eeg = 2   # 脑电通道数
-lim = 80   # 截止频率点计数
+lim = 120   # 截止频率点计数
 fs = 1000.0 # 采样频率
 n_sec = 4   # 分段时长
 
@@ -168,8 +169,8 @@ for i in range(len(file_idx)):
         f, p = sig.periodogram(wave, fs, axis=2, nfft=4000)
 
         # 选取限定范围内的频率与功率点对
-        f = f[1:lim+1]
-        p = p[:, :, 1:lim+1]
+        f = f[0:lim+1]
+        p = p[:, :, 0:lim+1]
         p = p.mean(axis=1)
         info_list[i].append((f, p))
 
@@ -194,7 +195,7 @@ for i in range(ch):
     bar_offset_arr = [-0.2, 0, 0.2]
     # 子波频率
     x_band = np.arange(4)
-    x_band_label = ['0.5-2', '2-4', '4-10', '10-20']
+    x_band_label = ['0.5-4', '4-8', '8-13', '13-30']
 
     # 遍历通道内不同睡眠类型
     for j, c in enumerate(['wake', 'nrem', 'rem']):
@@ -205,10 +206,15 @@ for i in range(ch):
         # 功率分布百分比折线图
         plt.subplot(1, 2, 1)
         plt.plot(x, y_norm, label=c)
+        ax = plt.gca()
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+
 
         # 波段功率占比条形图
         plt.subplot(1, 2, 2)
         plt.bar(x_band + bar_offset_arr[j], y_band, width, label=c)
+        ax = plt.gca()
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
 
         # 更改为对数分贝单位
         # plt.semilogy(x, y, label=c)

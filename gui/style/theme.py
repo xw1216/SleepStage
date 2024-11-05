@@ -1,4 +1,3 @@
-import os.path
 import sys
 
 from PySide6.QtGui import QColor

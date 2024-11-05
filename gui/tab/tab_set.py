@@ -1,4 +1,4 @@
-from PySide6.QtCore import Slot, QSize, SIGNAL, Signal
+from PySide6.QtCore import Slot, QSize,  Signal
 from PySide6.QtWidgets import QTabWidget, QSizePolicy, QMessageBox, QFileDialog
 
 from gui.tab.base_tab import BaseTab
@@ -16,7 +16,7 @@ class TabSetWidget(QTabWidget):
 
     sig_start_raw_extract = Signal(dict)
     sig_start_psd_plot = Signal(dict, tuple, str)
-    sig_read_out_file_meta = Signal(list[str], int, int)
+    sig_read_out_file_meta = Signal(list, int, int)
 
     def __init__(self, kit=None, parent=None):
         super().__init__(parent=parent)
@@ -51,6 +51,7 @@ class TabSetWidget(QTabWidget):
             elif isinstance(tab, SpaceTimeSelectTab):
                 self.sig_read_out_file_meta.connect(tab.on_read_out_file_meta)
                 tab.sig_space_time_sel_done.connect(self.on_space_time_select_done)
+                self.sig_start_psd_plot.connect(self.kit.rev_ch_time_selection)
                 self.kit.sig_psd_calc_plot_done.connect(self.on_psd_calc_plot_done)
 
 
@@ -63,6 +64,7 @@ class TabSetWidget(QTabWidget):
     @Slot()
     def on_raw_extract_done(self, chs: list[str], wnd_cnt: int, wnd_sec: int):
         self.setCurrentIndex(1)
+        LOG.info('数据提取完成，请继续操作')
         self.sig_read_out_file_meta.emit(chs, wnd_cnt, wnd_sec)
 
     @Slot(str)

@@ -1,4 +1,3 @@
-import sys
 import ctypes
 
 import pyqtgraph

@@ -73,8 +73,11 @@ class BaseTab(QWidget):
 
     def collect_checked_items(self):
         items = {}
-        for item in self.list_option.selectedItems():
-            items.update({item.text(), item.data(Qt.ItemDataRole.UserRole)})
+        n_items = self.list_option.count()
+        for i in range(n_items):
+            item = self.list_option.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                items.update({item.text(): item.data(Qt.ItemDataRole.UserRole)})
         return items
 
 

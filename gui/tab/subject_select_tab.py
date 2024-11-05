@@ -1,5 +1,4 @@
 import os.path
-from re import escape
 
 from PySide6.QtCore import Slot, Qt, Signal
 from PySide6.QtGui import QColor

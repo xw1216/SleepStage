@@ -7,6 +7,7 @@ test/**/*.svg
 *.7z
 *.gif
 *.ttf
+*.xlsx
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

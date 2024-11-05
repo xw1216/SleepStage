@@ -1,6 +1,6 @@
 from PySide6.QtCore import Slot, Qt, Signal
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QGridLayout, QLabel, QSpinBox, QWidget, QScrollBar, QSlider, QMessageBox
+from PySide6.QtWidgets import QGridLayout, QLabel, QWidget, QSlider, QMessageBox
 
 from gui.style.icon import ICONS
 from gui.style.theme import NAV_LABEL_STYLE

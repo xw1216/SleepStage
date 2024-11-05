@@ -1,9 +1,8 @@
-import datetime
 import logging
 
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QMainWindow, QStatusBar, QVBoxLayout, QWidget, QSizePolicy
+from PySide6.QtWidgets import QMainWindow, QStatusBar
 from qt_material import QtStyleTools
 
 from gui.tab.tab_set import TabSetWidget
@@ -12,7 +11,7 @@ from utils.log import LOG
 
 
 class MainGUI(QMainWindow, QtStyleTools):
-    def __init__(self, log_level=logging.INFO):
+    def __init__(self):
         super().__init__()
         self.setWindowTitle('MiceSleepAnalysis')
         self.kit = Analyzer()

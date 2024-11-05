@@ -1,6 +1,5 @@
 import os
 import shutil
-from operator import index
 
 import numpy as np
 import pandas as pd
@@ -11,8 +10,7 @@ from sonpy import lib as sp
 from sonpy.amd64.sonpy import SonFile
 
 from utils.log import LOG
-from utils.path import data_src_dir, data_tgt_dir, epoch_file_ext_name, raw_eeg_file_ext_name, info_file_ext_name, \
-    extract_eeg_ext_name
+from utils.path import *
 
 
 class Analyzer(QObject):
@@ -46,20 +44,24 @@ class Analyzer(QObject):
         self.wnd_cnt = -1
 
         self.nfft = 10000
+        self.fft_freq_down = 5
         self.fft_freq_up = 300
+        self.cnt_band = 4
         self.low_cut = 0.3
         self.high_cut = 30
 
         self.fs = -1
         self.pts = -1
 
-        self.sub_pair = {}
-        self.ch_pair = {}
+        self.sub_pair: dict[str, int] = {}
+        self.ch_pair: dict[str, int] = {}
         self.time_range: tuple[int, int] = (0, 0)
+
         self.save_path = '.'
 
     @Slot(dict)
     def rev_sub_selection(self, sub_pair: dict[str, int]):
+        self.reset()
         self.sub_pair = sub_pair
         try:
             ch_pair = self.collect_raw_meta(sub_pair)
@@ -143,7 +145,7 @@ class Analyzer(QObject):
 
     def read_sonpy_meta_info(self, handle: SonFile):
         file_ch_meta = []
-        n_ch = handle.GetNumChannels()
+        n_ch = handle.MaxChannels()
         for ch in range(n_ch):
             if (handle.ChannelType(ch) == sp.DataType.Adc and
                     handle.GetChannelTitle(ch).startswith('M')):
@@ -151,6 +153,7 @@ class Analyzer(QObject):
                 fs = round(1 / handle.GetTimeBase())
                 if self.fs < 0:
                     self.fs = fs
+                    self.pts = handle.ChannelMaxTime(ch)
                     self.nfft = self.fs * 10
                 else:
                     if self.fs != round(1 / handle.GetTimeBase()):
@@ -205,7 +208,7 @@ class Analyzer(QObject):
     def rev_ch_time_selection(self, ch_pairs: dict, t_range: tuple[int, int], save_path: str):
         self.ch_pair = ch_pairs
         self.time_range = t_range
-
+        # TODO 支持选择时间范围功能
         info_list = self.calc_sleep_type_psd()
         self.save_psd_table(info_list, save_path)
 
@@ -268,7 +271,7 @@ class Analyzer(QObject):
         columns = ['个体', '睡眠类型', '通道', '频率点(Hz)', '功率谱密度(uV^2/Hz)']
         for (i, sub) in enumerate(self.sub_pair.keys()):
             df = pd.DataFrame(columns=columns)
-            for (j, tp) in ['wake', 'nrem', 'rem']:
+            for (j, tp) in enumerate(['wake', 'nrem', 'rem']):
                 freq = info_list[i][j][0]
                 psd = info_list[i][j][1]
                 for (k, ch) in enumerate(self.ch_pair.keys()):
@@ -304,7 +307,7 @@ class Analyzer(QObject):
         y_norm = np.concatenate((np.zeros(self.fft_freq_down), y_norm), axis=0)
 
         # 计算分频段功率占比
-        delta = y_norm[self.fft_freq_down:40]               # [0.5, 4)
+        delta = y_norm[self.fft_freq_down:40].sum()         # [0.5, 4)
         theta = y_norm[40:80].sum()                         # [4, 8)
         alpha = y_norm[80:130].sum()                        # [8, 13)
         beta = y_norm[130:self.fft_freq_up + 1].sum()       # [13, 30]
@@ -326,7 +329,7 @@ class Analyzer(QObject):
                 for k in range(3):
                     # source shape [sub, type, (f [freq], p[ch, freq])]
                     x = info_list[j][k][0]
-                    y = info_list[j][k][1][ch]
+                    y = info_list[j][k][1][i]
                     x, y_norm, y_band = self.calc_band_psd(x, y)
 
                     # result shape [ch, sub, type] element (x, y_norm, y_band)

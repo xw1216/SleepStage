@@ -4,9 +4,7 @@ import shutil
 import numpy as np
 import pandas as pd
 import scipy.signal as sig
-import matplotlib.pyplot as plt
 from PySide6.QtCore import QObject, Slot, Signal
-from matplotlib.ticker import FormatStrFormatter
 from sonpy import lib as sp
 from sonpy.amd64.sonpy import SonFile
 
@@ -17,7 +15,7 @@ from utils.path import *
 class Analyzer(QObject):
     sig_raw_extract_done = Signal(list, int, int)
     sig_extract_error = Signal(str)
-    sig_psd_calc_plot_done = Signal()
+    sig_psd_calc_plot_done = Signal(list, np.ndarray, str)
 
     def __init__(self):
         super().__init__()
@@ -83,6 +81,7 @@ class Analyzer(QObject):
         pair_ch_list = []
 
         for sub in sub_pair.keys():
+            LOG.info(f'正在提取 {sub} 的数据元信息')
             sub_src = os.path.join(src_dir, sub + raw_eeg_file_ext_name())
             handle = self.open_sonpy_file(sub_src)
 
@@ -91,7 +90,6 @@ class Analyzer(QObject):
             self.save_sub_info(sub, file_ch_meta)
 
             self.copy_epoch_files(sub)
-            LOG.info(f'正在提取 {sub} 的数据元信息')
 
         # shape [sub, ch] element dict
         ch_pair = self.check_ch_consist(pair_ch_list)
@@ -179,6 +177,7 @@ class Analyzer(QObject):
         src_dir = data_src_dir()
 
         for sub in sub_pair.keys():
+            LOG.info(f'正在提取 {sub} 的信号记录')
             sub_src = os.path.join(src_dir, sub + raw_eeg_file_ext_name())
             handle = self.open_sonpy_file(sub_src)
 
@@ -189,7 +188,6 @@ class Analyzer(QObject):
                 data = data.reshape(1, self.pts)
                 wave = np.concatenate((wave, data), axis=0)
             self.save_sub_data(sub, wave)
-            LOG.info(f'正在提取 {sub} 的信号记录')
 
     @staticmethod
     def save_sub_data(key: str, data: np.ndarray):
@@ -215,9 +213,8 @@ class Analyzer(QObject):
 
         result = self.transpose_info_list(info_list)
         plot_data = self.calc_average_plot_data(result)
-        self.plot_and_save_psd(plot_data, save_path)
 
-        self.sig_psd_calc_plot_done.emit()
+        self.sig_psd_calc_plot_done.emit(list(self.ch_pair.keys()), plot_data.copy(), save_path)
 
     def calc_sleep_type_psd(self, t_range: tuple[int, int]):
         # info_list shape [sub, type, (f [freq], p[ch, freq])]
@@ -366,81 +363,3 @@ class Analyzer(QObject):
 
         # result shape [ch, type] element (x, y_norm, y_band)
         return plot_data
-
-    def plot_and_save_psd(self, plot_data, save_path):
-        chs = self.ch_pair.keys()
-        save_path = os.path.join(save_path, 'figure')
-        os.makedirs(save_path, exist_ok=True)
-
-        LOG.info('正在绘制功率谱密度图')
-
-        for (i, ch) in enumerate(chs):
-            label = ch
-            # 图片大小
-            plt.figure(figsize=(10, 6))
-            # 全图属性
-            plt.title(f'{label} power spectral')
-            # 关闭数据图坐标轴
-            plt.axis('off')
-            plt.xticks([])
-            plt.yticks([])
-
-            # 条形图宽度与坐标偏移
-            width = 0.2
-            bar_offset_arr = [-0.2, 0, 0.2]
-            # 子波频率
-            x_band = np.arange(self.cnt_band)
-            x_band_label = ['0.5-4', '4-8', '8-13', '13-30']
-
-            # 遍历通道内不同睡眠类型
-            for j, c in enumerate(['wake', 'nrem', 'rem']):
-                x = plot_data[i][j][0]
-                y_norm = plot_data[i][j][1]
-                y_band = plot_data[i][j][2]
-
-                # 功率分布百分比折线图
-                plt.subplot(1, 2, 1)
-                plt.plot(x, y_norm, label=c)
-                ax = plt.gca()
-                ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
-
-                # 波段功率占比条形图
-                plt.subplot(1, 2, 2)
-                plt.bar(x_band + bar_offset_arr[j], y_band, width, label=c)
-                ax = plt.gca()
-                ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
-
-                # 更改为对数分贝单位
-                # plt.semilogy(x, y, label=c)
-
-            # 设置折线图图标，属性
-            # 换颜色可以查询设置 matplotlib 的 cmap
-            plt.subplot(1, 2, 1)
-
-            # plt.ylim((1, 1e4))
-            # plt.ylabel('PSD [uV^2/Hz]')
-            # 设置单位
-            plt.xlabel('Frequency (Hz)')
-            plt.ylabel('Normalized power (%)')
-            # 展示网格
-            plt.grid(True)
-            # 图例
-            plt.legend()
-
-            # 设置条形图图标，属性
-            plt.subplot(1, 2, 2)
-
-            plt.xticks(x_band, x_band_label)
-            plt.xlabel('Frequency Range (Hz)')
-            plt.ylabel('Percentage Sum (a.u.)')
-            # plt.grid(True)
-            plt.legend()
-
-            fig_save_path = os.path.join(save_path, f'psd_{ch}.png')
-            plt.savefig(fig_save_path)
-
-            # TODO
-            # 展示图片
-            plt.show()
-            plt.clf()
-            plt.close()

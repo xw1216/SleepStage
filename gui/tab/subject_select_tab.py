@@ -117,6 +117,7 @@ class SubjectSelectTab(BaseTab):
         if len(pairs.keys()) < 1:
             QMessageBox.warning(self, "警告", "没有选择任何个体")
             return
+        LOG.info(f'选取的个体：{list(pairs.keys())}')
         self.sig_sub_sel_done.emit(pairs)
 
 

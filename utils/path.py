@@ -1,8 +1,13 @@
 import os.path
+import sys
 
 
 def get_svg_url(name):
-    path = os.path.join(os.getcwd(), 'gui', 'style', 'svg', name + '.svg')
+    if hasattr(sys, '_MEIPASS'):
+        # noinspection PyProtectedMember
+        path = os.path.join(sys._MEIPASS, 'svg', name + '.svg')
+    else:
+        path = os.path.join(os.getcwd(), 'svg', name + '.svg')
     path = path.replace('\\', '/')
     return path
 

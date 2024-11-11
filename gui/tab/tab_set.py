@@ -1,3 +1,4 @@
+import numpy as np
 from PySide6.QtCore import Slot, QSize,  Signal
 from PySide6.QtWidgets import QTabWidget, QSizePolicy, QMessageBox, QFileDialog
 
@@ -6,6 +7,7 @@ from gui.tab.space_time_select_tab import SpaceTimeSelectTab
 from gui.tab.subject_select_tab import SubjectSelectTab
 from proc.analyzer import Analyzer
 from utils.log import LOG
+from utils.plot import plot_and_save_psd
 
 
 class TabSetWidget(QTabWidget):
@@ -76,14 +78,20 @@ class TabSetWidget(QTabWidget):
     @Slot(dict, tuple)
     def on_space_time_select_done(self, items, t_range):
         save_path = QFileDialog.getExistingDirectory(caption='请选择结果保存文件夹')
+        if len(save_path) < 1:
+            QMessageBox.critical(self, '错误','未选择结果保存文件夹')
+            LOG.error('未选择结果保存文件夹')
+            return
+
         save_path = str(save_path)
         self.sig_start_psd_plot.emit(items, t_range, save_path)
         LOG.info('开始数据分析')
 
-    @Slot()
-    def on_psd_calc_plot_done(self):
+    @Slot(list, np.ndarray, str)
+    def on_psd_calc_plot_done(self, chs: list[str], plot_data: np.ndarray, save_path: str):
+        plot_and_save_psd(chs, plot_data, save_path)
         QMessageBox.information(self, '通知', '分析成功完成')
-        LOG.info('分析完成')
+        LOG.info('分析完成，请到结果文件夹查看')
 
 
 

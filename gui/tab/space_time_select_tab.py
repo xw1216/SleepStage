@@ -125,5 +125,8 @@ class SpaceTimeSelectTab(BaseTab):
             QMessageBox.warning(self, "警告", "起始时间不能大于终止时间")
             return
 
-        self.sig_space_time_sel_done.emit(items, t_range)
         LOG.info('通道与时间选择完成')
+        LOG.info(f'选取的通道：{list(items.keys())}')
+        LOG.info(f'选取的时间：{self.time_format_converter(t_range[0])} - {self.time_format_converter(t_range[1])}')
+        self.sig_space_time_sel_done.emit(items, t_range)
+
